@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\..\source\xcompression.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\source\xcompression.h" />
+    <ClInclude Include="..\..\source\unit-test\xcompression_unittest.h">
+      <Filter>Unit-test</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\updateDependencies.bat" />
+    <None Include="..\..\README.md" />
+    <None Include="..\..\documentation\documentation.md">
+      <Filter>documentation</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Unit-test">
+      <UniqueIdentifier>{54dd6209-efc5-417d-987b-2b055c4fa4ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="documentation">
+      <UniqueIdentifier>{78133bd7-f5d9-4714-886a-ac70143f87bc}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
