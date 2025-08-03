@@ -1,6 +1,9 @@
-﻿# xcompression: Supercharge Your Data Compression in C++ with Zstd!
+﻿# xcompression: Supercharge Your Data Compression in C++
 
-Unlock the full potential of high-speed, efficient data compression with xcompression – a modern C++ wrapper around the blazing-fast Facebook Zstandard (Zstd) library! Bid farewell to cumbersome compression APIs and embrace a streamlined interface for block and streaming modes, fixed or dynamic blocks, and tunable compression levels. Whether you're crunching big data, optimizing storage, or streaming content, xcompression delivers top-tier performance with ease!
+Unlock the full potential of high-speed, efficient data compression with xcompression – a modern C++ wrapper around the blazing-fast 
+Facebook Zstandard (Zstd) library! Bid farewell to cumbersome compression APIs and embrace a streamlined interface for block and 
+streaming modes, fixed or dynamic blocks, and tunable compression levels. Whether you're crunching big data, optimizing storage, 
+or streaming content, xcompression delivers top-tier performance with ease!
 
 ## Key Features
 
@@ -8,12 +11,12 @@ Unlock the full potential of high-speed, efficient data compression with xcompre
 * ***Fixed & Dynamic Blocks:*** Choose fixed for predictable sizing or dynamic for adaptive compression on varied data patterns
 * ***Compression Levels:*** FAST for speed, MEDIUM for balance, HIGH for maximum ratio – pick your power!
 * ***Smart Error Handling:*** Lightweight `err` struct with states like OK, FAILURE, NOT_DONE, and INCOMPRESSIBLE (fallback to original data effortlessly)
-* ***Modern C++ Goodness:*** Uses `std::span<std::byte>` for safe, efficient memory views; C++17+ compatible
+* ***Modern C++ Goodness:*** Uses `std::span<std::byte>` for safe, efficient memory views; C++20 compatible
 * ***Incompressible Data Detection:*** Automatically signals when compression doesn't shrink data, saving you time and space
 * ***Zstd-Powered:*** Leverages the proven Zstd engine for ultra-fast compression/decompression
 * ***MIT License:*** Completely open and free to use
 * ***Easy Integration:*** Include `xcompression.h`, link against Zstd (`-lzstd`), and you're set – no other dependencies!
-* ***Documentation:*** Documentated so you can follow up easiely 
+* ***Documentation:*** [Documentated](https://github.com/LIONant-depot/xcompression/blob/main/documentation/documentation.md) so you can follow up easiely 
 
 ## Code Example
 
