@@ -54,20 +54,20 @@ namespace xcompression
     }
 
     //-------------------------------------------------------------------------------------------------------
-    err fixed_block_compress::Init(bool bBlockSizeIsOutputSize, std::uint64_t BlockSize, const std::span<const std::byte> SourceUncompress, level CompressionLevel) noexcept
+    xerr fixed_block_compress::Init(bool bBlockSizeIsOutputSize, std::uint64_t BlockSize, const std::span<const std::byte> SourceUncompress, level CompressionLevel) noexcept
     {
         assert(!m_pCCTX);
         assert(BlockSize > 0);
         assert(SourceUncompress.data());
 
         auto pCCTX = ZSTD_createCCtx();
-        if (!pCCTX) return err::create_f<"Error ZSTD_createCCtx">();
+        if (!pCCTX) return xerr::create_f<"Error ZSTD_createCCtx">();
 
         // Reset context to ensure clean state
         if (ZSTD_isError(ZSTD_CCtx_reset(pCCTX, ZSTD_reset_session_and_parameters)))
         {
             ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(pCCTX));
-            return err::create_f<"Error ZSTD_CCtx_reset">();
+            return xerr::create_f<"Error ZSTD_CCtx_reset">();
         }
 
         // Set compression parameters
@@ -83,7 +83,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(pCCTX));
-            return err::create_f<"Error setting compression level">();
+            return xerr::create_f<"Error setting compression level">();
         }
 
         // Set block size for block mode
@@ -93,7 +93,7 @@ namespace xcompression
             {
                 PrintError(err);
                 ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(pCCTX));
-                return err::create_f<"Error setting target block size">();
+                return xerr::create_f<"Error setting target block size">();
             }
         }
 
@@ -102,7 +102,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(pCCTX));
-            return err::create_f<"Error setting source size hint">();
+            return xerr::create_f<"Error setting source size hint">();
         }
 
         // Disable multi-threading for synchronous operation
@@ -110,7 +110,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(pCCTX));
-            return err::create_f<"Error disabling multi-threading">();
+            return xerr::create_f<"Error disabling multi-threading">();
         }
 
         m_pCCTX = pCCTX;
@@ -129,7 +129,7 @@ namespace xcompression
     }
 
     //-------------------------------------------------------------------------------------------------------
-    err fixed_block_compress::Pack(std::uint64_t& CompressedSize, std::span<std::byte> Destination) noexcept
+    xerr fixed_block_compress::Pack(std::uint64_t& CompressedSize, std::span<std::byte> Destination) noexcept
     {
         assert(m_pCCTX);
         assert(Destination.data());
@@ -141,7 +141,7 @@ namespace xcompression
         {
             // Block mode: Ensure output buffer is at least input size
             if (Destination.size() < m_Src.size())
-                return err::create_f<"Output buffer too small">();
+                return xerr::create_f<"Output buffer too small">();
 
             // Compress entire source as a single frame
             ZSTD_inBuffer in = { m_Src.data(), m_Src.size(), 0 };
@@ -151,15 +151,15 @@ namespace xcompression
             if (ZSTD_isError(rc))
             {
                 PrintError(rc);
-                return err::create_f<"Compression failed">();
+                return xerr::create_f<"Compression failed">();
             }
 
             CompressedSize = out.pos;
             if (CompressedSize >= m_Src.size())
-                return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
+                return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
 
             m_Position = m_Src.size();
-            return rc == 0 ? err{} : err::create<err::state::NOT_DONE, "Waiting to flush">();
+            return rc == 0 ? xerr{} : xerr::create<state::NOT_DONE, "Waiting to flush">();
         }
 
         // Streaming mode
@@ -173,7 +173,7 @@ namespace xcompression
             ZSTD_EndDirective end = ZSTD_e_end;
 
             if (Destination.size() < InSize)
-                return err::create_f<"Output buffer too small">();
+                return xerr::create_f<"Output buffer too small">();
 
             ZSTD_inBuffer in = { &m_Src[m_Position], InSize, 0 };
             ZSTD_outBuffer out = { Destination.data(), Destination.size(), 0 };
@@ -182,7 +182,7 @@ namespace xcompression
             if (ZSTD_isError(rc))
             {
                 PrintError(rc);
-                return err::create_f<"Compression failed">();
+                return xerr::create_f<"Compression failed">();
             }
 
             totalOutput += out.pos;
@@ -190,7 +190,7 @@ namespace xcompression
             CompressedSize = totalOutput;
 
             if (totalOutput >= InSize)
-                return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
+                return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
         }
 
         // Flush if all input processed and no error
@@ -205,40 +205,40 @@ namespace xcompression
                 if (ZSTD_isError(rc))
                 {
                     PrintError(rc);
-                    return err::create_f<"Compression flush failed">();
+                    return xerr::create_f<"Compression flush failed">();
                 }
                 totalOutput += out.pos;
                 if (rc == 0) // Flush complete
                 {
                     CompressedSize = totalOutput;
-                    return err{};
+                    return xerr{};
                 }
                 if (out.pos == 0) // Buffer full or no more data
                     break;
             }
 
             CompressedSize = totalOutput;
-            return err::create<err::state::NOT_DONE, "More data to flush">();
+            return xerr::create<state::NOT_DONE, "More data to flush">();
         }
 
         CompressedSize = totalOutput;
-        return err::create<err::state::NOT_DONE, "More data to process">();
+        return xerr::create<state::NOT_DONE, "More data to process">();
     }
 
     //-------------------------------------------------------------------------------------------------------
-    err fixed_block_decompress::Init(bool bBlockIsOutputSize, std::uint64_t BlockSize) noexcept
+    xerr fixed_block_decompress::Init(bool bBlockIsOutputSize, std::uint64_t BlockSize) noexcept
     {
         assert(!m_pDCTX);
         assert(BlockSize > 0);
 
         auto pDCTX = ZSTD_createDCtx();
-        if (!pDCTX) return err::create_f<"Failed to create decompression context">();
+        if (!pDCTX) return xerr::create_f<"Failed to create decompression context">();
 
         // Reset context to ensure clean state
         if (ZSTD_isError(ZSTD_DCtx_reset(pDCTX, ZSTD_reset_session_and_parameters)))
         {
             ZSTD_freeDCtx(pDCTX);
-            return err::create_f<"Error ZSTD_DCtx_reset">();
+            return xerr::create_f<"Error ZSTD_DCtx_reset">();
         }
 
         m_BlockSize = BlockSize;
@@ -250,7 +250,7 @@ namespace xcompression
         {
             PrintError(windowLog);
             ZSTD_freeDCtx(pDCTX);
-            return err::create_f<"Error setting windowLogMax">();
+            return xerr::create_f<"Error setting windowLogMax">();
         }
 
         m_pDCTX = pDCTX;
@@ -267,14 +267,14 @@ namespace xcompression
     }
 
     //-------------------------------------------------------------------------------------------------------
-    err fixed_block_decompress::Unpack(std::uint32_t& DecompressSize, std::span<std::byte> DestinationUncompress, const std::span<const std::byte> SourceCompressed) noexcept
+    xerr fixed_block_decompress::Unpack(std::uint32_t& DecompressSize, std::span<std::byte> DestinationUncompress, const std::span<const std::byte> SourceCompressed) noexcept
     {
         assert(m_pDCTX);
         assert(!DestinationUncompress.empty());
         assert(!SourceCompressed.empty());
 
         if (DestinationUncompress.size() != m_BlockSize)
-            return err::create_f<"Output buffer size must equal BlockSize">();
+            return xerr::create_f<"Output buffer size must equal BlockSize">();
 
         DecompressSize = 0;
 
@@ -285,7 +285,7 @@ namespace xcompression
             if (ZSTD_isError(rc))
             {
                 PrintError(rc);
-                return err::create_f<"Decompression failed">();
+                return xerr::create_f<"Decompression failed">();
             }
 
             DecompressSize = static_cast<std::uint32_t>(rc);
@@ -302,30 +302,30 @@ namespace xcompression
         if (ZSTD_isError(rc))
         {
             PrintError(rc);
-            return err::create_f<"Decompression failed">();
+            return xerr::create_f<"Decompression failed">();
         }
 
         DecompressSize = static_cast<std::uint32_t>(out.pos);
         m_Position += in.pos;
         m_OutputPosition += DecompressSize;
-        return (in.pos < in.size || rc != 0) ? err::create<err::state::NOT_DONE, "More data to decompress">() : err{};
+        return (in.pos < in.size || rc != 0) ? xerr::create<state::NOT_DONE, "More data to decompress">() : xerr{};
     }
 
     //-------------------------------------------------------------------------------------------------------
-    err dynamic_block_compress::Init(bool bBlockSizeIsOutputSize, std::uint64_t BlockSize, const std::span<const std::byte> SourceUncompress, level CompressionLevel) noexcept
+    xerr dynamic_block_compress::Init(bool bBlockSizeIsOutputSize, std::uint64_t BlockSize, const std::span<const std::byte> SourceUncompress, level CompressionLevel) noexcept
     {
         assert(!m_pCCTX);
         assert(BlockSize > 0);
         assert(SourceUncompress.data());
 
         auto pCCTX = ZSTD_createCCtx();
-        if (!pCCTX) return err::create_f<"Error ZSTD_createCCtx">();
+        if (!pCCTX) return xerr::create_f<"Error ZSTD_createCCtx">();
 
         // Reset context to ensure clean state
         if (ZSTD_isError(ZSTD_CCtx_reset(pCCTX, ZSTD_reset_session_and_parameters)))
         {
             ZSTD_freeCCtx(pCCTX);
-            return err::create_f<"Error ZSTD_CCtx_reset">();
+            return xerr::create_f<"Error ZSTD_CCtx_reset">();
         }
 
         // Set compression parameters
@@ -341,7 +341,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(pCCTX);
-            return err::create_f<"Error setting compression level">();
+            return xerr::create_f<"Error setting compression level">();
         }
 
         // Set block size for block mode
@@ -351,7 +351,7 @@ namespace xcompression
             {
                 PrintError(err);
                 ZSTD_freeCCtx(pCCTX);
-                return err::create_f<"Error setting target block size">();
+                return xerr::create_f<"Error setting target block size">();
             }
         }
 
@@ -360,7 +360,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(pCCTX);
-            return err::create_f<"Error setting source size hint">();
+            return xerr::create_f<"Error setting source size hint">();
         }
 
         // Disable multi-threading for synchronous operation
@@ -368,7 +368,7 @@ namespace xcompression
         {
             PrintError(err);
             ZSTD_freeCCtx(pCCTX);
-            return err::create_f<"Error disabling multi-threading">();
+            return xerr::create_f<"Error disabling multi-threading">();
         }
 
         // Make sure that the check sum is turn off
@@ -376,7 +376,7 @@ namespace xcompression
         {
             PrintError(Err);
             ZSTD_freeCCtx(pCCTX);
-            return err::create_f<"Error setting forceIgnoreChecksum">();
+            return xerr::create_f<"Error setting forceIgnoreChecksum">();
         }
 
 
@@ -397,7 +397,7 @@ namespace xcompression
 
     //-------------------------------------------------------------------------------------------------------
 
-    err dynamic_block_compress::Pack(std::uint64_t& CompressedSize, std::span<std::byte> Destination ) noexcept
+    xerr dynamic_block_compress::Pack(std::uint64_t& CompressedSize, std::span<std::byte> Destination ) noexcept
     {
         assert(m_pCCTX);
         assert(Destination.data());
@@ -409,7 +409,7 @@ namespace xcompression
         {
             // Block mode: Ensure output buffer is at least input size
             if (Destination.size() < m_Src.size())
-                return err::create_f<"Output buffer too small">();
+                return xerr::create_f<"Output buffer too small">();
 
             // Compress entire source as a single frame
             ZSTD_inBuffer in = { m_Src.data(), m_Src.size(), 0 };
@@ -419,15 +419,15 @@ namespace xcompression
             if (ZSTD_isError(rc))
             {
                 PrintError(rc);
-                return err::create_f<"Compression failed">();
+                return xerr::create_f<"Compression failed">();
             }
 
             CompressedSize = out.pos;
             if (CompressedSize >= m_Src.size())
-                return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
+                return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
 
             m_Position = m_Src.size();
-            return rc == 0 ? err{} : err::create<err::state::NOT_DONE, "Waiting to flush">();
+            return rc == 0 ? xerr{} : xerr::create<state::NOT_DONE, "Waiting to flush">();
         }
 
         // Streaming mode: Use binary search to find input size for compressed output ~ BlockSize
@@ -436,7 +436,7 @@ namespace xcompression
         {
             const auto Left = m_Src.size() - m_Position;
             if (Destination.size() < m_BlockSize)
-                return err::create_f<"Output buffer too small">();
+                return xerr::create_f<"Output buffer too small">();
 
             size_t low  = std::min( Left, m_BlockSize );
             size_t high = std::min( Left, m_BlockSize*3 );
@@ -461,7 +461,7 @@ namespace xcompression
                 if (ZSTD_isError(rc))
                 {
                     PrintError(rc);
-                    return err::create_f<"Compression failed">();
+                    return xerr::create_f<"Compression failed">();
                 }
 
                 // Include the flash
@@ -474,7 +474,7 @@ namespace xcompression
                     if (ZSTD_isError(rc))
                     {
                         PrintError(rc);
-                        return err::create_f<"Compression failed">();
+                        return xerr::create_f<"Compression failed">();
                     }
 
                     // The compression is telling us we can not fit...
@@ -519,7 +519,7 @@ namespace xcompression
                 if (ZSTD_isError(rc))
                 {
                     PrintError(rc);
-                    return err::create_f<"Compression failed">();
+                    return xerr::create_f<"Compression failed">();
                 }
 
                 // Include the flash
@@ -530,7 +530,7 @@ namespace xcompression
                 if (ZSTD_isError(rc))
                 {
                     PrintError(rc);
-                    return err::create_f<"Compression failed">();
+                    return xerr::create_f<"Compression failed">();
                 }
 
                 out.pos += out2.pos;
@@ -541,14 +541,14 @@ namespace xcompression
             CompressedSize = totalOutput;
 
             if (in.pos == m_BlockSize)
-                return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
+                return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
         }
 
         // we are done...
         if (m_Position == m_Src.size()) 
             return {};
 
-        return err::create<err::state::NOT_DONE, "More data to process">();
+        return xerr::create<state::NOT_DONE, "More data to process">();
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -655,19 +655,19 @@ namespace xcompression
     */
 
     //-------------------------------------------------------------------------------------------------------
-    err dynamic_block_decompress::Init(bool bBlockIsOutputSize, std::uint64_t BlockSize) noexcept
+    xerr dynamic_block_decompress::Init(bool bBlockIsOutputSize, std::uint64_t BlockSize) noexcept
     {
         assert(!m_pDCTX);
         assert(BlockSize > 0);
 
         auto pDCTX = ZSTD_createDCtx();
-        if (!pDCTX) return err::create_f<"Failed to create decompression context">();
+        if (!pDCTX) return xerr::create_f<"Failed to create decompression context">();
 
         // Reset context to ensure clean state
         if (ZSTD_isError(ZSTD_DCtx_reset(pDCTX, ZSTD_reset_session_and_parameters)))
         {
             ZSTD_freeDCtx(pDCTX);
-            return err::create_f<"Error ZSTD_DCtx_reset">();
+            return xerr::create_f<"Error ZSTD_DCtx_reset">();
         }
 
         m_BlockSize = BlockSize;
@@ -679,7 +679,7 @@ namespace xcompression
         {
             PrintError(windowLog);
             ZSTD_freeDCtx(pDCTX);
-            return err::create_f<"Error setting windowLogMax">();
+            return xerr::create_f<"Error setting windowLogMax">();
         }
 
         // Reduce buffering by ignoring checksums (optional, for performance)
@@ -687,7 +687,7 @@ namespace xcompression
         {
             PrintError(1);
             ZSTD_freeDCtx(pDCTX);
-            return err::create_f<"Error setting forceIgnoreChecksum">();
+            return xerr::create_f<"Error setting forceIgnoreChecksum">();
         }
 
         m_pDCTX = pDCTX;
@@ -706,7 +706,7 @@ namespace xcompression
 
     //-------------------------------------------------------------------------------------------------------
 
-    err dynamic_block_decompress::Unpack(std::uint32_t& DecompressSize, std::span<std::byte> DestinationUncompress, const std::span<const std::byte> SourceCompressed) noexcept
+    xerr dynamic_block_decompress::Unpack(std::uint32_t& DecompressSize, std::span<std::byte> DestinationUncompress, const std::span<const std::byte> SourceCompressed) noexcept
     {
         assert(m_pDCTX);
         assert(!DestinationUncompress.empty());
@@ -721,7 +721,7 @@ namespace xcompression
             if (ZSTD_isError(rc))
             {
                 PrintError(rc);
-                return err::create_f<"Decompression failed">();
+                return xerr::create_f<"Decompression failed">();
             }
 
             DecompressSize = static_cast<std::uint32_t>(rc);
@@ -738,12 +738,12 @@ namespace xcompression
         if (ZSTD_isError(rc))
         {
             PrintError(rc);
-            return err::create_f<"Decompression failed">();
+            return xerr::create_f<"Decompression failed">();
         }
 
         DecompressSize = static_cast<std::uint32_t>(out.pos);
         m_Position += in.pos;
         m_OutputPosition += DecompressSize;
-        return (in.pos < in.size || rc != 0) ? err::create<err::state::NOT_DONE, "More data to decompress">() : err{};
+        return (in.pos < in.size || rc != 0) ? xerr::create<state::NOT_DONE, "More data to decompress">() : xerr{};
     }
 }

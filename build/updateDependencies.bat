@@ -42,6 +42,11 @@ rmdir "../dependencies/zstd" /S /Q
 git clone https://github.com/facebook/zstd.git "../dependencies/zstd"
 if %ERRORLEVEL% GEQ 1 goto :ERROR
 
+rmdir "../dependencies/xerr" /S /Q
+git clone https://github.com/LIONant-depot/xerr.git "../dependencies/xerr"
+if %ERRORLEVEL% GEQ 1 goto :ERROR
+
+
 :COMPILATION
 powershell write-host -fore White ------------------------------------------------------------------------------------------------------
 powershell write-host -fore White XCOMPRESSION - COMPILING DEPENDENCIES

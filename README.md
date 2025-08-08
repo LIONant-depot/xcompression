@@ -10,13 +10,18 @@ or streaming content, xcompression delivers top-tier performance with ease!
 * ***Dual Modes Mastery:*** Seamless support for block mode (single-frame compression) and streaming mode (chunked processing for large datasets)
 * ***Fixed & Dynamic Blocks:*** Choose fixed for predictable sizing or dynamic for adaptive compression on varied data patterns
 * ***Compression Levels:*** FAST for speed, MEDIUM for balance, HIGH for maximum ratio – pick your power!
-* ***Smart Error Handling:*** Lightweight `err` struct with states like OK, FAILURE, NOT_DONE, and INCOMPRESSIBLE (fallback to original data effortlessly)
+* ***Smart Error Handling:*** Lightweight `xerr` struct with states like OK, FAILURE, NOT_DONE, and INCOMPRESSIBLE (fallback to original data effortlessly)
 * ***Modern C++ Goodness:*** Uses `std::span<std::byte>` for safe, efficient memory views; C++20 compatible
 * ***Incompressible Data Detection:*** Automatically signals when compression doesn't shrink data, saving you time and space
 * ***Zstd-Powered:*** Leverages the proven Zstd engine for ultra-fast compression/decompression
 * ***MIT License:*** Completely open and free to use
 * ***Easy Integration:*** Include `xcompression.h`, link against Zstd (`-lzstd`), and you're set – no other dependencies!
 * ***Documentation:*** [Documentated](https://github.com/LIONant-depot/xcompression/blob/main/documentation/documentation.md) so you can follow up easiely 
+* ***Units Tests:*** [Unit Test](https://github.com/LIONant-depot/xcompression/tree/main/source/unit-test) Help with documentation and make sure everything works!
+
+## Dependencies
+* [Facebook Zstd](https://github.com/facebook/zstd) For compression, (BSD License) Free to use with attribution 
+* [xerr](https://github.com/LIONant-depot/xerr/tree/main) For errors, (MIT)
 
 ## Code Example
 
