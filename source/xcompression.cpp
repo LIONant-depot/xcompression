@@ -168,14 +168,14 @@ namespace xcompression
         // Process input chunk if available
         if (m_Position < m_Src.size())
         {
-            const auto Left = m_Src.size() - m_Position;
-            const auto InSize = Left > m_BlockSize ? m_BlockSize : Left;
-            ZSTD_EndDirective end = ZSTD_e_end;
+            const auto        Left   = m_Src.size() - m_Position;
+            const auto        InSize = Left > m_BlockSize ? m_BlockSize : Left;
+            ZSTD_EndDirective end    = ZSTD_e_end;
 
             if (Destination.size() < InSize)
                 return xerr::create_f<state, "Output buffer too small">();
 
-            ZSTD_inBuffer in = { &m_Src[m_Position], InSize, 0 };
+            ZSTD_inBuffer  in  = { &m_Src[m_Position], InSize, 0 };
             ZSTD_outBuffer out = { Destination.data(), Destination.size(), 0 };
 
             size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, end);
@@ -186,7 +186,7 @@ namespace xcompression
             }
 
             totalOutput += out.pos;
-            m_Position += in.pos;
+            m_Position  += in.pos;
             CompressedSize = totalOutput;
 
             if (totalOutput >= InSize)
@@ -198,7 +198,7 @@ namespace xcompression
         {
             while (true)
             {
-                ZSTD_inBuffer in = { nullptr, 0, 0 };
+                ZSTD_inBuffer  in  = { nullptr, 0, 0 };
                 ZSTD_outBuffer out = { Destination.data() + totalOutput, Destination.size() - totalOutput, 0 };
 
                 size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, ZSTD_e_flush);
@@ -434,18 +434,16 @@ namespace xcompression
         size_t totalOutput = 0;
         if (m_Position < m_Src.size())
         {
-            const auto Left = m_Src.size() - m_Position;
-            if (Destination.size() < m_BlockSize)
-                return xerr::create_f<state, "Output buffer too small">();
+            const auto          Left                 = m_Src.size() - m_Position;
+            const std::size_t   MaxSizeAllowed       = std::min(Left, m_BlockSize);
+            std::size_t         low                  = MaxSizeAllowed;
+            std::size_t         high                 = std::min( Left, MaxSizeAllowed*4 );
+            std::size_t         optimalInSize        = 0;
+            std::size_t         optimalCompressed    = 0;
 
-            size_t low  = std::min( Left, m_BlockSize );
-            size_t high = std::min( Left, m_BlockSize*3 );
-            size_t optimalInSize = 0;
-            size_t optimalCompressed = 0;
-
-            ZSTD_inBuffer  in;
-            ZSTD_outBuffer out;
-            bool           bLastWasOptimal = false;
+            ZSTD_inBuffer       in;
+            ZSTD_outBuffer      out;
+            bool                bLastWasOptimal      = false;
 
             // Maximun number of searching steps...
             int CountDown = 10;
@@ -453,9 +451,11 @@ namespace xcompression
             // Binary search for optimal input size
             while (low <= high && (--CountDown))
             {
+                ZSTD_CCtx_reset(static_cast<ZSTD_CCtx*>(m_pCCTX), ZSTD_reset_session_only);
+
                 size_t mid = low + (high - low) / 2;
-                in  = ZSTD_inBuffer{ &m_Src[m_Position], mid, 0 };
-                out = ZSTD_outBuffer{ Destination.data(), m_BlockSize, 0 };
+                in  = ZSTD_inBuffer { &m_Src[m_Position],  mid,            0 };
+                out = ZSTD_outBuffer{ Destination.data(),  MaxSizeAllowed, 0 };
 
                 size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, ZSTD_e_end);
                 if (ZSTD_isError(rc))
@@ -463,33 +463,40 @@ namespace xcompression
                     PrintError(rc);
                     return xerr::create_f<state, "Compression failed">();
                 }
-
-                // Include the flash
-                if (out.pos < m_BlockSize)
+                
+                if (out.pos < MaxSizeAllowed)
                 {
-                    auto in2  = ZSTD_inBuffer{ nullptr, 0, 0 };
-                    auto out2 = ZSTD_outBuffer{ Destination.data() + out.pos, m_BlockSize - out.pos, 0 };
-                    rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out2, &in2, ZSTD_e_flush);
-
-                    if (ZSTD_isError(rc))
+                    // Include the flash
+                    if (rc == 0)
                     {
-                        PrintError(rc);
-                        return xerr::create_f<state, "Compression failed">();
+                        // Frame is complete, no need for flush
                     }
+                    else
+                    {
+                        auto in2 = ZSTD_inBuffer{ nullptr, 0, 0 };
+                        auto out2 = ZSTD_outBuffer{ Destination.data() + out.pos, MaxSizeAllowed - out.pos, 0 };
+                        rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out2, &in2, ZSTD_e_flush);
 
-                    // The compression is telling us we can not fit...
-                    if (rc) out.pos = m_BlockSize *2;
+                        if (ZSTD_isError(rc))
+                        {
+                            PrintError(rc);
+                            return xerr::create_f<state, "Compression failed">();
+                        }
 
-                    // Add it to the total
-                    out.pos += out2.pos;
+                        // The compression is telling us we can not fit...
+                        if (rc) out.pos = MaxSizeAllowed * 2;
+
+                        // Add it to the total
+                        out.pos += out2.pos;
+                    }
                 }
                 else
                 {
                     // The compression is telling us we can not fit...
-                    out.pos = m_BlockSize * 2;
+                    out.pos = MaxSizeAllowed * 2;
                 }
 
-                if (out.pos >= m_BlockSize || (in.pos != in.size))
+                if (out.pos >= MaxSizeAllowed || (in.pos != in.size))
                 {
                     high = mid - 1;
                     bLastWasOptimal = false;
@@ -507,13 +514,15 @@ namespace xcompression
             if (optimalInSize==0)
             {
                 out.pos = 0;
-                in.size = in.pos = m_BlockSize;
+                in.size = in.pos = MaxSizeAllowed;
             }
             // Compress with optimal input size and finalize frame
             else if ( bLastWasOptimal == false)
             {
-                in  = ZSTD_inBuffer{ &m_Src[m_Position], optimalInSize, 0 };
-                out = ZSTD_outBuffer{ Destination.data(), m_BlockSize, 0 };
+                ZSTD_CCtx_reset(static_cast<ZSTD_CCtx*>(m_pCCTX), ZSTD_reset_session_only);
+
+                in  = ZSTD_inBuffer{ &m_Src[m_Position],  optimalInSize,  0 };
+                out = ZSTD_outBuffer{ Destination.data(), MaxSizeAllowed, 0 };
 
                 size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, ZSTD_e_end);
                 if (ZSTD_isError(rc))
@@ -523,24 +532,31 @@ namespace xcompression
                 }
 
                 // Include the flash
-                auto in2  = ZSTD_inBuffer{ nullptr, 0, 0 };
-                auto out2 = ZSTD_outBuffer{ Destination.data() + out.pos, m_BlockSize - out.pos, 0 };
-                rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out2, &in2, ZSTD_e_flush);
-
-                if (ZSTD_isError(rc))
+                if (rc == 0)
                 {
-                    PrintError(rc);
-                    return xerr::create_f<state, "Compression failed">();
+                    // Frame is complete, no need for flush
                 }
+                else
+                {
+                    auto in2 = ZSTD_inBuffer{ nullptr, 0, 0 };
+                    auto out2 = ZSTD_outBuffer{ Destination.data() + out.pos, MaxSizeAllowed - out.pos, 0 };
+                    rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out2, &in2, ZSTD_e_flush);
 
-                out.pos += out2.pos;
+                    if (ZSTD_isError(rc))
+                    {
+                        PrintError(rc);
+                        return xerr::create_f<state, "Compression failed">();
+                    }
+
+                    out.pos += out2.pos;
+                }
             }
 
             totalOutput = out.pos;
             m_Position += in.pos;
             CompressedSize = totalOutput;
 
-            if (in.pos == m_BlockSize)
+            if (in.pos == MaxSizeAllowed)
                 return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
         }
 
@@ -552,109 +568,7 @@ namespace xcompression
     }
 
     //-------------------------------------------------------------------------------------------------------
-/*
-    err dynamic_block_compress::Pack(std::uint64_t& CompressedSize, std::span<std::byte> Destination) noexcept
-    {
-        assert(m_pCCTX);
-        assert(Destination.data());
-        assert(m_Position <= m_Src.size());
 
-        CompressedSize = 0;
-
-        if (m_bBlockSizeIsOutputSize)
-        {
-            // Block mode: Ensure output buffer is at least input size
-            if (Destination.size() < m_Src.size())
-                return err::create_f<"Output buffer too small">();
-
-            // Compress entire source as a single frame
-            ZSTD_inBuffer in = { m_Src.data(), m_Src.size(), 0 };
-            ZSTD_outBuffer out = { Destination.data(), Destination.size(), 0 };
-
-            size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, ZSTD_e_end);
-            if (ZSTD_isError(rc))
-            {
-                PrintError(rc);
-                return err::create_f<"Compression failed">();
-            }
-
-            CompressedSize = out.pos;
-            if (CompressedSize >= m_Src.size())
-                return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
-
-            m_Position = m_Src.size();
-            return rc == 0 ? err{} : err::create<err::state::NOT_DONE, "Waiting to flush">();
-        }
-
-        // Streaming mode: Consume input to maximize output up to BlockSize
-        size_t totalOutput = 0;
-        if (m_Position < m_Src.size())
-        {
-            do
-            {
-                const auto Left = m_Src.size() - m_Position;
-                const auto InSize = Left; // Process as much input as needed
-                ZSTD_EndDirective end = (Left <= m_BlockSize && Destination.size() >= Left) ? ZSTD_e_end : ZSTD_e_continue;
-
-                if (Destination.size() < m_BlockSize)
-                    return err::create_f<"Output buffer too small">();
-
-                ZSTD_inBuffer in = { &m_Src[m_Position], InSize, 0 };
-                ZSTD_outBuffer out = { Destination.data(), m_BlockSize, 0 };
-
-                size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, end);
-                if (ZSTD_isError(rc))
-                {
-                    PrintError(rc);
-                    return err::create_f<"Compression failed">();
-                }
-
-                totalOutput += out.pos;
-                m_Position  += in.pos;
-                CompressedSize = totalOutput;
-
-                if (totalOutput >= InSize)
-                    return err::create<err::state::INCOMPRESSIBLE, "Data incompressible">();
-            } while(CompressedSize == 0 && m_Position != m_Src.size());
-
-            if (m_Position != m_Src.size()) 
-                return err::create<err::state::NOT_DONE, "More data to process">();
-        }
-
-        // Flush if all input processed and no error
-        if (m_Position == m_Src.size())
-        {
-        //    while (true)
-            {
-                ZSTD_inBuffer in = { nullptr, 0, 0 };
-                ZSTD_outBuffer out = { Destination.data() + totalOutput, m_BlockSize, 0 };
-
-                size_t rc = ZSTD_compressStream2(static_cast<ZSTD_CCtx*>(m_pCCTX), &out, &in, ZSTD_e_flush);
-                if (ZSTD_isError(rc))
-                {
-                    PrintError(rc);
-                    return err::create_f<"Compression flush failed">();
-                }
-                totalOutput += out.pos;
-                if (rc == 0) // Flush complete
-                {
-                    CompressedSize = totalOutput;
-                    return err{};
-                }
-                if (out.pos == 0) // Buffer full or no more data
-                    return {};
-            }
-
-            CompressedSize = totalOutput;
-            return err::create<err::state::NOT_DONE, "More data to flush">();
-        }
-
-        CompressedSize = totalOutput;
-        return err::create<err::state::NOT_DONE, "More data to process">();
-    }
-    */
-
-    //-------------------------------------------------------------------------------------------------------
     xerr dynamic_block_decompress::Init(bool bBlockIsOutputSize, std::uint64_t BlockSize) noexcept
     {
         assert(!m_pDCTX);
@@ -731,7 +645,7 @@ namespace xcompression
         }
 
         // Streaming mode
-        ZSTD_inBuffer in = { SourceCompressed.data(), SourceCompressed.size(), 0 };
+        ZSTD_inBuffer  in  = { SourceCompressed.data(),      SourceCompressed.size(),      0 };
         ZSTD_outBuffer out = { DestinationUncompress.data(), DestinationUncompress.size(), 0 };
 
         size_t rc = ZSTD_decompressStream(static_cast<ZSTD_DCtx*>(m_pDCTX), &out, &in);
@@ -742,7 +656,7 @@ namespace xcompression
         }
 
         DecompressSize = static_cast<std::uint32_t>(out.pos);
-        m_Position += in.pos;
+        m_Position       += in.pos;
         m_OutputPosition += DecompressSize;
         return (in.pos < in.size || rc != 0) ? xerr::create<state::NOT_DONE, "More data to decompress">() : xerr{};
     }

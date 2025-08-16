@@ -37,7 +37,7 @@ namespace xcompression::unit_test
                     {
                         std::cout << "Streaming mode (input-driven): Data incompressible at position " << compressor.m_Position << ", using original chunk\n";
                         streamCompressedBlocks.emplace_back(Source.begin() + lastPosition, Source.begin() + compressor.m_Position);
-                        TotalSizeCompress += BlockSize;
+                        TotalSizeCompress += (compressor.m_Position - lastPosition);
                         continue;
                     }
                     else if (err.getState<xcompression::state>() != xcompression::state::NOT_DONE)
@@ -73,9 +73,10 @@ namespace xcompression::unit_test
             std::array              buffer          = { std::vector<std::byte>(BlockSize), std::vector<std::byte>(BlockSize) };
             int                     useBuffer       = 0;
             std::vector<std::byte>  rebuiltSource   = {};
+            int                     Pos             = 0;
             for (const auto& block : streamCompressedBlocks)
             {
-                if (block.size() == BlockSize)
+                if (block.size() == BlockSize || ((block.size() == (Source.size() - rebuiltSource.size()))) )
                 {
                     rebuiltSource.insert(rebuiltSource.end(), block.begin(), block.end());
                     continue;
@@ -299,7 +300,7 @@ namespace xcompression::unit_test
                     {
                         std::cout << "Streaming mode (input-driven, dynamic): Data incompressible at position " << compressor.m_Position << ", using original chunk\n";
                         streamCompressedBlocks.emplace_back(Source.begin() + lastPosition, Source.begin() + compressor.m_Position);
-                        TotalSizeCompress += BlockSize;
+                        TotalSizeCompress += (compressor.m_Position - lastPosition);
                         continue;
                     }
                     else if (err.getState<xcompression::state>() != xcompression::state::NOT_DONE)
@@ -340,7 +341,7 @@ namespace xcompression::unit_test
             for (const auto& block : streamCompressedBlocks)
             {
                 // This is a block that did not get compressed
-                if (block.size() == BlockSize)
+                if (block.size() == BlockSize || ((Pos + block.size()) == rebuiltSource.size() ))
                 {
                     for (int i = 0; i < block.size(); ++i)
                     {
@@ -382,7 +383,7 @@ namespace xcompression::unit_test
 
     void RunAllUnitTest()
     {
-        constexpr auto SourceSize = 1000;
+        constexpr auto SourceSize = 2221;
         constexpr auto BlockSize  = 100;
 
         //
@@ -418,9 +419,9 @@ namespace xcompression::unit_test
         //
         // Run all the tests
         //
-        TestFixedInputDrivenStreaming(source, BlockSize);
-        TestFixedBlock(source);
-        TestDynamicBlock(source);
-        TestDynamicInputDrivenStreaming(source, BlockSize);
+        if (true) TestFixedInputDrivenStreaming(source, BlockSize);
+        if (true) TestFixedBlock(source);
+        if (true) TestDynamicBlock(source);
+        if (true) TestDynamicInputDrivenStreaming(source, BlockSize);
     }
 }
