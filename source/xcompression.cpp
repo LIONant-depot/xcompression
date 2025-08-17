@@ -380,11 +380,12 @@ namespace xcompression
         }
 
 
-        m_pCCTX = pCCTX;
-        m_Src = SourceUncompress;
-        m_BlockSize = BlockSize;
-        m_bBlockSizeIsOutputSize = bBlockSizeIsOutputSize;
-        m_Position = 0;
+        m_pCCTX                     = pCCTX;
+        m_Src                       = SourceUncompress;
+        m_BlockSize                 = BlockSize;
+        m_bBlockSizeIsOutputSize    = bBlockSizeIsOutputSize;
+        m_Position                  = 0;
+        m_CompressionLevel          = CompressionLevel;
 
         return {};
     }
@@ -446,7 +447,7 @@ namespace xcompression
             bool                bLastWasOptimal      = false;
 
             // Maximun number of searching steps...
-            int CountDown = 10;
+            int CountDown = m_CompressionLevel == level::HIGH ? 1000 : 15;
 
             // Binary search for optimal input size
             while (low <= high && (--CountDown))

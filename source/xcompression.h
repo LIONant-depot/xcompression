@@ -101,11 +101,12 @@ namespace xcompression
         // Returns err::state::NOT_DONE in streaming mode if more data needs to be processed.
         xerr Pack(std::uint64_t& CompressedSize, std::span<std::byte> DestinationCompress) noexcept;
 
-        void* m_pCCTX = nullptr;
-        std::uint64_t m_Position = 0;
-        std::span<const std::byte> m_Src = {};
-        std::uint64_t m_BlockSize = 0;
-        bool m_bBlockSizeIsOutputSize = false;
+        void*                       m_pCCTX                     = nullptr;
+        std::uint64_t               m_Position                  = 0;
+        std::span<const std::byte>  m_Src                       = {};
+        std::uint64_t               m_BlockSize                 = 0;
+        level                       m_CompressionLevel          = {};
+        bool                        m_bBlockSizeIsOutputSize    = false;
     };
 
     //-----------------------------------------------------------------------------------------------------
@@ -125,11 +126,11 @@ namespace xcompression
         // Returns err::state::NOT_DONE in streaming mode if more data needs to be processed.
         xerr Unpack(std::uint32_t& DecompressSize, std::span<std::byte> DestinationUncompress, const std::span<const std::byte> SourceCompressed) noexcept;
 
-        void* m_pDCTX = nullptr;
-        std::uint64_t m_Position = 0; // Tracks input progress
-        std::uint64_t m_OutputPosition = 0; // Tracks output progress
-        std::uint64_t m_BlockSize = 0;
-        bool m_bBlockIsOutputSize = false;
+        void*           m_pDCTX = nullptr;
+        std::uint64_t   m_Position = 0; // Tracks input progress
+        std::uint64_t   m_OutputPosition = 0; // Tracks output progress
+        std::uint64_t   m_BlockSize = 0;
+        bool            m_bBlockIsOutputSize = false;
     };
 }
 
