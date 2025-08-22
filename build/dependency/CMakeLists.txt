@@ -77,7 +77,7 @@ if(NOT TARGET xcompression)
   add_library(xcompression INTERFACE)
 
   # determine the root of our library
-  if("${TARGET_PROJECT}" STREQUAL "xcompression_unit_test")
+  if(DEFINED TARGET_PROJECT AND "${TARGET_PROJECT}" STREQUAL "xcompression_unit_test")
     set(ROOT ".")
   else()
     set(ROOT "dependencies/xcompression")
