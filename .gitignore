@@ -417,3 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 /dependencies
+/build/xcompression_unit_test.vs2022
