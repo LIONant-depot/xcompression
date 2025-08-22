@@ -8,10 +8,11 @@
 //-------------------------------------------------------------------------------------------------------
 // Add libz libraries
 //-------------------------------------------------------------------------------------------------------
+#pragma message("***NOTE*** xcompression.cpp is adding to the program the zstd_static.lib library")
 #if _DEBUG
-# pragma comment(lib, "dependencies/zstd/build/VS2010/libzstd/bin/x64_Debug/libzstd_static.lib")
+# pragma comment(lib, "build-cmake/lib/Debug/zstd_static.lib")
 #else
-# pragma comment(lib, "dependencies/zstd/build/VS2010/libzstd/bin/x64_Release/libzstd_static.lib")
+# pragma comment(lib, "build-cmake/lib/Release/zstd_static.lib")
 #endif
 
 namespace xcompression
