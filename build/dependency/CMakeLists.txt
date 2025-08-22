@@ -1,6 +1,11 @@
 # The library
 cmake_minimum_required(VERSION 3.10)
 
+# Set policy CMP0169 to OLD to allow FetchContent_Populate
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 OLD)
+endif()
+
 #
 # Populate zstd
 #
@@ -14,7 +19,7 @@ FetchContent_Declare(
 FetchContent_GetProperties(zstd)
 if(NOT zstd_POPULATED)
   message(STATUS "Populating zstd...")
-  FetchContent_MakeAvailable(zstd)
+  FetchContent_Populate(zstd)
 
   # Create the visual studio solution for the zstd
   execute_process(
@@ -61,7 +66,7 @@ FetchContent_Declare(
 FetchContent_GetProperties(xerr)
 if(NOT xerr_POPULATED)
   message(STATUS "Populating xerr...")
-  FetchContent_MakeAvailable(xerr)
+  FetchContent_Populate(xerr)
   
   # Include xerr's CMakeLists.txt
   add_subdirectory("${CMAKE_SOURCE_DIR}/dependencies/xerr/build/dependency" "${CMAKE_CURRENT_BINARY_DIR}/xerr")
@@ -79,11 +84,18 @@ if(NOT TARGET xcompression)
   # determine the root of our library
   if(DEFINED TARGET_PROJECT AND "${TARGET_PROJECT}" STREQUAL "xcompression_unit_test")
     set(ROOT ".")
+
+    # set the include path
+    set(XCOMPRESSION_INCLUDE_LIST "${CMAKE_SOURCE_DIR}/dependencies/zstd"
+    )
+
   else()
     set(ROOT "dependencies/xcompression")
 
     # set the include path
-    set(XCOMPRESSION_INCLUDE_LIST "${ROOT}")
+    set(XCOMPRESSION_INCLUDE_LIST "${ROOT}"
+                                  "${CMAKE_SOURCE_DIR}/dependencies/zstd"
+    )
   endif()
 
   # set the files required

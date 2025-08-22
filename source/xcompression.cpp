@@ -1,5 +1,5 @@
 #define ZSTD_STATIC_LINKING_ONLY
-#include "../dependencies/zstd/lib/zstd.h"
+#include "lib/zstd.h"
 #include "xcompression.h"
 #include <cassert>
 #include <cstring>
