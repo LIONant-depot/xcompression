@@ -1,31 +1,99 @@
 include(${CMAKE_BINARY_DIR}/_deps/xcmake_tools/Common.cmake)
 
-# Fetch and build zstd
+#
+# Fetch zstd
+#
 FetchAndPopulate("https://github.com/facebook/zstd.git" "release")
-execute_process(
-  COMMAND ${CMAKE_COMMAND} -B build-cmake -S build/cmake -G "Visual Studio 17 2022" -A x64
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/dependencies/zstd"
-  RESULT_VARIABLE result
+
+DefineInterfaceComponent(zstd "dependencies/zstd"
+  "**source"
+  "lib/common/debug.c"
+  "lib/common/entropy_common.c"
+  "lib/common/error_private.c"
+  "lib/common/fse_decompress.c"
+  "lib/common/pool.c"
+  "lib/common/threading.c"
+  "lib/common/xxhash.c"
+  "lib/common/zstd_common.c"
+  "lib/compress/fse_compress.c"
+  "lib/compress/hist.c"
+  "lib/compress/huf_compress.c"
+  "lib/compress/zstd_compress.c"
+  "lib/compress/zstd_compress_literals.c"
+  "lib/compress/zstd_compress_sequences.c"
+  "lib/compress/zstd_compress_superblock.c"
+  "lib/compress/zstd_double_fast.c"
+  "lib/compress/zstd_fast.c"
+  "lib/compress/zstd_lazy.c"
+  "lib/compress/zstd_ldm.c"
+  "lib/compress/zstd_opt.c"
+  "lib/compress/zstd_preSplit.c"
+  "lib/compress/zstdmt_compress.c"
+  "lib/decompress/huf_decompress.c"
+  "lib/decompress/zstd_ddict.c"
+  "lib/decompress/zstd_decompress.c"
+  "lib/decompress/zstd_decompress_block.c"
+  "lib/dictBuilder/cover.c"
+  "lib/dictBuilder/divsufsort.c"
+  "lib/dictBuilder/fastcover.c"
+  "lib/dictBuilder/zdict.c"
+  "lib/legacy/zstd_v01.c"
+  "lib/legacy/zstd_v02.c"
+  "lib/legacy/zstd_v03.c"
+  "lib/legacy/zstd_v04.c"
+  "lib/legacy/zstd_v05.c"
+  "lib/legacy/zstd_v06.c"
+  "lib/legacy/zstd_v07.c"
+  "**headers"
+  "lib/zdict.h"
+  "lib/zstd.h"
+  "lib/zstd_errors.h"
+  "lib/common/allocations.h"
+  "lib/common/bits.h"
+  "lib/common/bitstream.h"
+  "lib/common/compiler.h"
+  "lib/common/cpu.h"
+  "lib/common/debug.h"
+  "lib/common/error_private.h"
+  "lib/common/fse.h"
+  "lib/common/huf.h"
+  "lib/common/mem.h"
+  "lib/common/pool.h"
+  "lib/common/portability_macros.h"
+  "lib/common/threading.h"
+  "lib/common/xxhash.h"
+  "lib/common/zstd_deps.h"
+  "lib/common/zstd_internal.h"
+  "lib/common/zstd_trace.h"
+  "lib/compress/clevels.h"
+  "lib/compress/hist.h"
+  "lib/compress/zstd_compress_internal.h"
+  "lib/compress/zstd_compress_literals.h"
+  "lib/compress/zstd_compress_sequences.h"
+  "lib/compress/zstd_compress_superblock.h"
+  "lib/compress/zstd_cwksp.h"
+  "lib/compress/zstd_double_fast.h"
+  "lib/compress/zstd_fast.h"
+  "lib/compress/zstd_lazy.h"
+  "lib/compress/zstd_ldm.h"
+  "lib/compress/zstd_ldm_geartab.h"
+  "lib/compress/zstd_opt.h"
+  "lib/compress/zstd_preSplit.h"
+  "lib/compress/zstdmt_compress.h"
+  "lib/decompress/zstd_ddict.h"
+  "lib/decompress/zstd_decompress_block.h"
+  "lib/decompress/zstd_decompress_internal.h"
+  "lib/dictBuilder/cover.h"
+  "lib/dictBuilder/divsufsort.h"
+  "lib/legacy/zstd_legacy.h"
+  "lib/legacy/zstd_v01.h"
+  "lib/legacy/zstd_v02.h"
+  "lib/legacy/zstd_v03.h"
+  "lib/legacy/zstd_v04.h"
+  "lib/legacy/zstd_v05.h"
+  "lib/legacy/zstd_v06.h"
+  "lib/legacy/zstd_v07.h"
 )
-if(result)
-  message(FATAL_ERROR "zstd CMake generation failed: ${result}")
-endif()
-execute_process(
-  COMMAND ${CMAKE_COMMAND} --build build-cmake --config Release --target libzstd_static
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/dependencies/zstd"
-  RESULT_VARIABLE result
-)
-if(result)
-  message(FATAL_ERROR "zstd Release build failed: ${result}")
-endif()
-execute_process(
-  COMMAND ${CMAKE_COMMAND} --build build-cmake --config Debug --target libzstd_static
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/dependencies/zstd"
-  RESULT_VARIABLE result
-)
-if(result)
-  message(FATAL_ERROR "zstd Debug build failed: ${result}")
-endif()
 
 # Fetch xerr
 FetchAndPopulate("https://github.com/LIONant-depot/xerr.git" "main")
@@ -36,10 +104,3 @@ DefineInterfaceComponent(xcompression "dependencies/xcore"
   "source/xcompression.cpp"
   "README.md"
 )
-if(xcompression_CREATED)
-   AppendComponentIncludes(xcompression "${CMAKE_SOURCE_DIR}/dependencies/zstd")
-
-   # Set linker paths
-   set_property(GLOBAL PROPERTY xcompression_LINKER_PATHS "${CMAKE_SOURCE_DIR}/dependencies/zstd")
-endif()
-

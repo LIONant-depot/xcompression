@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(xcompression_unit_test LANGUAGES CXX)
+project(xcompression_unit_test LANGUAGES CXX C)
 set(TARGET_PROJECT "xcompression_unit_test")
 set(COMPONENT_REGISTRY "")
 
