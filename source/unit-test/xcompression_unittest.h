@@ -380,6 +380,45 @@ namespace xcompression::unit_test
     }
 
     //-------------------------------------------------------------------------------------------------------------
+    // As xserializer packs: the destination is just one block, so an incompressible block fills it before zstd has read all of it.
+    // Each INCOMPRESSIBLE must move on by exactly one block (the caller stores it raw) - it used to stall and loop forever
+    void TestFixedIncompressibleBlocks(std::span<const std::byte> Source, const std::size_t BlockSize)
+    {
+        xcompression::fixed_block_compress compressor;
+        if (auto err = compressor.Init(false, BlockSize, Source, xcompression::fixed_block_compress::level::FAST); err) assert(false);
+
+        std::vector<std::byte> compressed(BlockSize);
+        int nRaw = 0, nSteps = 0;
+        while (true)
+        {
+            if (++nSteps > 10000) { std::cout << "Fixed blocks, incompressible data: stuck at " << compressor.m_Position << "\n"; assert(false); std::exit(1); }
+            const std::uint64_t Last = compressor.m_Position, ToCompress = std::min<std::uint64_t>(Source.size() - Last, BlockSize);
+            std::uint64_t       compressedSize = 0;
+            auto                err = compressor.Pack(compressedSize, std::span{ compressed.data(), ToCompress });
+            if (err && err.getState<xcompression::state>() == xcompression::state::INCOMPRESSIBLE)
+            {
+                assert(compressor.m_Position == Last + ToCompress);
+                ++nRaw;
+                continue;
+            }
+            assert(!err || err.getState<xcompression::state>() == xcompression::state::NOT_DONE);
+            if (!err) break;
+        }
+        assert(nRaw > 0 && compressor.m_Position == Source.size());
+
+        // one call for a whole compressible source that is one block (xserializer's info block): done, not NOT_DONE
+        {
+            std::vector<std::byte> Zeros(4096), Out(4096);
+            xcompression::fixed_block_compress One;
+            if (auto err = One.Init(false, Zeros.size(), Zeros, xcompression::fixed_block_compress::level::FAST); err) assert(false);
+            std::uint64_t Size = 0;
+            if (auto err = One.Pack(Size, Out); err) { std::cout << "Fixed blocks, one call: " << err.m_pMessage << "\n"; assert(false); std::exit(1); }
+            assert(Size > 0 && Size < Zeros.size());
+        }
+        std::cout << "Fixed blocks, incompressible data: " << nRaw << " raw blocks, done in " << nSteps << " steps\n";
+    }
+
+    //-------------------------------------------------------------------------------------------------------------
 
     void RunAllUnitTest()
     {
@@ -423,5 +462,14 @@ namespace xcompression::unit_test
         if (true) TestFixedBlock(source);
         if (true) TestDynamicBlock(source);
         if (true) TestDynamicInputDrivenStreaming(source, BlockSize);
+
+        std::vector<std::byte> noise(64 * 1024 * 3 + 777);
+        for (auto& b : noise) b = std::byte(static_cast<unsigned char>(dis(gen)));
+        if (true) TestFixedIncompressibleBlocks(noise, 64 * 1024);
+
+        // the O1 search (ratio guesses, early stop) on 64 KB blocks of mostly incompressible data with compressible runs, as BC textures are
+        std::vector<std::byte> mixed(noise);
+        for (std::size_t i = 0; i < mixed.size(); i += 4096) std::memset(&mixed[i], 0, std::min<std::size_t>(dis(gen) * 4, mixed.size() - i));
+        if (true) TestDynamicInputDrivenStreaming(mixed, 64 * 1024);
     }
 }

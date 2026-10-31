@@ -1,6 +1,7 @@
 #define ZSTD_STATIC_LINKING_ONLY
 #include "lib/zstd.h"
 #include "xcompression.h"
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -184,8 +185,17 @@ namespace xcompression
             m_Position  += in.pos;
             CompressedSize = totalOutput;
 
+            // The caller stores the whole block raw: skip all of it and drop the unfinished frame (zstd stops reading when the
+            // output is full, so in.pos may be short of InSize - even 0, and the caller looped forever on BC texture data)
             if (totalOutput >= InSize)
+            {
+                ZSTD_CCtx_reset(static_cast<ZSTD_CCtx*>(m_pCCTX), ZSTD_reset_session_only);
+                m_Position = m_Position - in.pos + InSize;
                 return xerr::create<state::INCOMPRESSIBLE, "Data incompressible">();
+            }
+
+            // The last block's frame is complete: done (a caller that packs in one call, as xserializer's info block, saw NOT_DONE)
+            if (rc == 0 && m_Position == m_Src.size()) return {};
         }
 
         // Flush if all input processed and no error
@@ -444,12 +454,20 @@ namespace xcompression
             // Maximun number of searching steps...
             int CountDown = m_CompressionLevel == level::HIGH ? 1000 : 15;
 
+            // Below HIGH the probes are guided: one block first, then the size the last ratio predicts (a little under); a block that does
+            // not fit gets one more try with the most input (noise then a compressible run) - 2-3 passes instead of up to 15
+            const bool          bGuided              = m_CompressionLevel != level::HIGH;
+            const std::size_t   Top                  = high;
+            std::size_t         Next                 = bGuided ? MaxSizeAllowed : 0;        // the next probe (0 = the middle)
+            auto                Guess                = [&]{ return low > high ? 0 : std::clamp<std::size_t>(static_cast<std::size_t>(double(optimalInSize) * MaxSizeAllowed / optimalCompressed * 0.98), low, high); };
+
             // Binary search for optimal input size
             while (low <= high && (--CountDown))
             {
                 ZSTD_CCtx_reset(static_cast<ZSTD_CCtx*>(m_pCCTX), ZSTD_reset_session_only);
 
-                size_t mid = low + (high - low) / 2;
+                size_t mid = Next ? Next : low + (high - low) / 2;
+                Next = 0;
                 in  = ZSTD_inBuffer { &m_Src[m_Position],  mid,            0 };
                 out = ZSTD_outBuffer{ Destination.data(),  MaxSizeAllowed, 0 };
 
@@ -496,6 +514,12 @@ namespace xcompression
                 {
                     high = mid - 1;
                     bLastWasOptimal = false;
+
+                    if (bGuided && optimalInSize == 0)
+                    {
+                        if (mid == MaxSizeAllowed && Top > mid) { low = mid + 1; high = Top; Next = Top; }
+                        else break;     // neither one block nor the most input fits: incompressible
+                    }
                 }
                 else
                 {
@@ -503,6 +527,10 @@ namespace xcompression
                     optimalCompressed = out.pos;
                     low = mid + 1;
                     bLastWasOptimal = true;
+
+                    // close enough to a full block, else the size the ratio predicts
+                    if (bGuided && out.pos * 100 >= MaxSizeAllowed * 95) break;
+                    if (bGuided) Next = Guess();
                 }
             }
 
