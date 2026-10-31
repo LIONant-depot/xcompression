@@ -17,6 +17,10 @@ namespace xcompression
     , INCOMPRESSIBLE
     };
 
+    // The decoded size a compressed block (one frame, as these compressors write them) says it has; 0 when the frame does not say
+    // (the caller then decodes it to find out). Lets blocks be decoded in parallel: each one's place in the output is known first.
+    std::uint64_t getDecodedSize(std::span<const std::byte> CompressedBlock) noexcept;
+
     //-----------------------------------------------------------------------------------------------------
     struct fixed_block_compress
     {

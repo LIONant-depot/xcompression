@@ -12,6 +12,13 @@
 
 namespace xcompression
 {
+    //-------------------------------------------------------------------------------------------------------
+    std::uint64_t getDecodedSize(std::span<const std::byte> CompressedBlock) noexcept
+    {
+        const auto Size = ZSTD_getFrameContentSize(CompressedBlock.data(), CompressedBlock.size());
+        return (Size == ZSTD_CONTENTSIZE_UNKNOWN || Size == ZSTD_CONTENTSIZE_ERROR) ? 0 : Size;
+    }
+
     //------------------------------------------------------------------------------
     // Description:
     // Computes the Log2 of an integral value.
